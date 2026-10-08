@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "lib": ["ES2016"],
+    "strict": true,
+    "moduleResolution": "node",
+    "module": "commonjs",
+    "typeRoots": ["./node_modules/@types", "./node_modules/@figma"],
+    "types": ["@figma/plugin-typings"]
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "figma-find-replace",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6 --format=iife --global-name=__plugin",
+    "watch": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es6 --format=iife --global-name=__plugin --watch"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.96.0",
+    "esbuild": "^0.20.2",
+    "typescript": "^5.4.5"
+  }
+}

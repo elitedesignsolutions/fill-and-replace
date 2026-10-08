@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Find &amp; Replace</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:            #ffffff;
+    --bg-2:          #f5f5f5;
+    --bg-3:          #ebebeb;
+    --border:        #e0e0e0;
+    --text:          #1e1e1e;
+    --text-2:        #666666;
+    --text-3:        #999999;
+    --accent:        #0d99ff;
+    --accent-bg:     #e5f4ff;
+    --chip-bg:       #ebebeb;
+    --seg-bg:        #ebebeb;
+    --seg-active-bg: #ffffff;
+    --preview-bg:    #f5f5f5;
+    --radius:        6px;
+    --match-hover:   #f7f7f7;
+    --match-active:  #e5f4ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:            #2c2c2c;
+      --bg-2:          #383838;
+      --bg-3:          #444444;
+      --border:        #4a4a4a;
+      --text:          #e6e6e6;
+      --text-2:        #999999;
+      --text-3:        #606060;
+      --accent-bg:     #0d3352;
+      --chip-bg:       #444444;
+      --seg-bg:        #1e1e1e;
+      --seg-active-bg: #383838;
+      --preview-bg:    #1e1e1e;
+      --match-hover:   #333333;
+      --match-active:  #0d3352;
+    }
+  }
+
+  body {
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--bg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ── Plugin header ──────────────────────────────────── */
+  .plugin-header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 14px 9px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .plugin-header-icon {
+    width: 26px; height: 26px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .plugin-header-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Scope bar ──────────────────────────────────────── */
+  /* ── Control bars (scope + category) ───────────────────*/
+  .ctrl-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .ctrl-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    width: 44px;
+  }
+
+  /* ── Context hint (selection / section / page) ──────── */
+  .selection-hint {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 14px;
+    font-size: 11px;
+    color: var(--text-2);
+    background: var(--accent-bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .selection-hint.warn { color: #c05000; background: #fff3e0; }
+  /* compact page picker inside the hint */
+  #pagePickerWrap select {
+    padding: 2px 22px 2px 6px;
+    font-size: 11px;
+    background: var(--bg);
+    border-color: var(--border);
+  }
+  @media (prefers-color-scheme: dark) {
+    .selection-hint { background: var(--accent-bg); }
+    .selection-hint.warn { background: #3a2500; color: #ffaa44; }
+  }
+
+  /* ── Category tabs ──────────────────────────────────── */
+
+  /* ── Body ───────────────────────────────────────────── */
+  .body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 12px 14px 0;
+    gap: 10px;
+  }
+
+  /* ── Panel ──────────────────────────────────────────── */
+  .panel { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+  .panel.hidden { display: none !important; }
+
+  /* ── Field group ────────────────────────────────────── */
+  .field-group { display: flex; flex-direction: column; gap: 4px; }
+  .field-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-2);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* ── Text input ─────────────────────────────────────── */
+  .text-input {
+    width: 100%;
+    padding: 6px 9px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .text-input:focus { border-color: var(--accent); background: var(--bg); }
+  .text-input::placeholder { color: var(--text-3); }
+
+  /* ── Input row (input + toggles) ────────────────────── */
+  .input-row { display: flex; gap: 5px; align-items: center; }
+  .input-row .text-input { flex: 1; }
+  .toggle-btn {
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-2);
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+    white-space: nowrap;
+  }
+  .toggle-btn:hover  { border-color: var(--accent); color: var(--accent); }
+  .toggle-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ── Color input row ────────────────────────────────── */
+  .color-row { display: flex; gap: 6px; align-items: center; }
+  .color-swatch-wrap { position: relative; width: 26px; height: 26px; flex-shrink: 0; cursor: pointer; }
+  .color-swatch {
+    width: 26px; height: 26px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer;
+  }
+  .color-swatch-wrap input[type="color"] {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    opacity: 0; cursor: pointer; border: none; padding: 0;
+  }
+  .color-row .text-input { flex: 1; font-family: "SF Mono","Fira Code","Menlo",monospace; }
+
+  /* ── Select ─────────────────────────────────────────── */
+  .select-wrap { position: relative; }
+  .select-wrap::after { content: "▾"; position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-2); pointer-events: none; }
+  select {
+    width: 100%; padding: 6px 26px 6px 9px;
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text);
+    font-family: inherit; font-size: 12px;
+    appearance: none; outline: none; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  select:focus { border-color: var(--accent); }
+  select option { background: var(--bg); color: var(--text); }
+  select option[value=""] { color: var(--text-3); }
+
+  /* ── Datalist input ─────────────────────────────────── */
+  datalist { display: none; }
+
+  /* ── Divider ────────────────────────────────────────── */
+  .divider { height: 1px; background: var(--border); flex-shrink: 0; }
+
+  /* ── Results area ───────────────────────────────────── */
+  .results-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 6px;
+  }
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .results-label { font-size: 10px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+  .results-count { font-size: 11px; color: var(--text-3); }
+  .results-count .n { color: var(--accent); font-weight: 600; }
+
+  .results-list {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    min-height: 0;
+  }
+  .results-list::-webkit-scrollbar { width: 4px; }
+  .results-list::-webkit-scrollbar-track { background: transparent; }
+  .results-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .results-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 64px;
+    color: var(--text-3);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  .match-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .match-row:last-child { border-bottom: none; }
+  .match-row:hover  { background: var(--match-hover); }
+  .match-row.active { background: var(--match-active); }
+
+  .match-type-icon {
+    width: 18px; height: 18px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-3);
+    margin-top: 1px;
+  }
+  .match-content { flex: 1; min-width: 0; }
+  .match-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .match-preview {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .match-replace-btn {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-3);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-top: 1px;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+  }
+  .match-replace-btn:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+  /* ── Footer buttons ─────────────────────────────────── */
+  .footer {
+    padding: 10px 14px 12px;
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+  }
+  .btn {
+    flex: 1;
+    padding: 7px 0;
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: opacity 0.15s;
+    letter-spacing: 0.01em;
+  }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn-primary   { background: var(--accent); color: #fff; }
+  .btn-primary:not(:disabled):hover  { opacity: 0.88; }
+  .btn-primary:not(:disabled):active { opacity: 0.72; }
+  .btn-secondary { background: var(--bg-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:not(:disabled):hover  { border-color: var(--accent); color: var(--accent); }
+  .btn-secondary:not(:disabled):active { opacity: 0.72; }
+  .btn-danger    { background: #ff4444; color: #fff; }
+  .btn-danger:not(:disabled):hover  { opacity: 0.88; }
+
+  /* ── Toast ──────────────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 56px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1e1e1e; color: #fff;
+    font-size: 11px; padding: 5px 12px;
+    border-radius: 20px; white-space: nowrap;
+    opacity: 0; transition: opacity 0.18s, transform 0.18s;
+    pointer-events: none; z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Resize handle ──────────────────────────────────── */
+  #resizeHandle {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 5px;
+    cursor: ns-resize; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #resizeHandle::after {
+    content: ''; display: block;
+    width: 28px; height: 3px; border-radius: 2px;
+    background: var(--border); transition: background 0.15s;
+  }
+  #resizeHandle:hover::after { background: var(--accent); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ────────────────────────────────────────────────────────── -->
+<div class="plugin-header">
+  <div class="plugin-header-icon">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="5.5" cy="5.5" r="3.8" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M8.5 8.5L12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M4 5.5h3M5.5 4v3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="plugin-header-name">Find &amp; Replace</div>
+</div>
+
+<!-- ── Category bar ───────────────────────────────────────────────────── -->
+<div class="ctrl-bar">
+  <span class="ctrl-label">What:</span>
+  <div class="select-wrap" style="flex:1">
+    <select id="catSelect">
+      <optgroup label="Copy">
+        <option value="text" selected>Text</option>
+        <option value="font">Font</option>
+        <option value="fontColor">Font Color</option>
+        <option value="fontSize">Font Size</option>
+        <option value="textDecoration">Text Decoration</option>
+        <option value="paragraphSpacing">Paragraph Spacing</option>
+        <option value="paragraphIndent">Paragraph Indent</option>
+        <option value="textCase">Text Case</option>
+      </optgroup>
+      <option value="styles">Library Styles</option>
+      <option value="shape">Shape &amp; Frame</option>
+      <option value="stroke">Stroke</option>
+      <option value="variables">Used Variables</option>
+    </select>
+  </div>
+</div>
+
+<!-- ── Scope bar ─────────────────────────────────────────────────────── -->
+<div class="ctrl-bar">
+  <span class="ctrl-label">Where:</span>
+  <div class="select-wrap" style="flex:1">
+    <select id="scopeSelect">
+      <option value="global" selected>Everywhere</option>
+      <option value="components">Components</option>
+      <option value="frames">Frames</option>
+      <option value="groups">Groups</option>
+      <option value="instances">Instances</option>
+      <option value="page">Page</option>
+      <option value="section">Section</option>
+      <option value="selection">Selection</option>
+    </select>
+  </div>
+</div>
+
+<!-- ── Context hint (selection / section / page picker) ──────────────── -->
+<div id="contextHint" class="selection-hint hidden">
+  <svg id="contextHintIcon" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1" y="1" width="4" height="4" rx="0.5"/>
+    <rect x="7" y="1" width="4" height="4" rx="0.5"/>
+    <rect x="1" y="7" width="4" height="4" rx="0.5"/>
+    <rect x="7" y="7" width="4" height="4" rx="0.5"/>
+  </svg>
+  <span id="contextHintText"></span>
+  <!-- page picker — only shown when scope=page -->
+  <div class="select-wrap" id="pagePickerWrap" style="flex:1;margin-left:4px;display:none">
+    <select id="pageSelect"></select>
+  </div>
+</div>
+
+<!-- ── Body ──────────────────────────────────────────────────────────── -->
+<div class="body">
+
+  <!-- ═══ TEXT PANEL ═══ -->
+  <div id="panelText" class="panel">
+    <div class="field-group">
+      <div class="field-label">Find</div>
+      <div class="input-row">
+        <input id="textFind" class="text-input" type="text" placeholder="Search text…" autocomplete="off" spellcheck="false" />
+        <div class="toggle-btn" id="btnCaseSensitive" title="Case sensitive">Aa</div>
+        <div class="toggle-btn" id="btnWholeWord"     title="Whole word">W</div>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <input id="textReplace" class="text-input" type="text" placeholder="Replacement text…" autocomplete="off" spellcheck="false" />
+    </div>
+  </div>
+
+  <!-- ═══ FONT PANEL ═══ -->
+  <div id="panelFont" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find font</div>
+      <div class="select-wrap">
+        <select id="fontFind">
+          <option value="">— Select a font —</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label" style="display:flex;align-items:center;justify-content:space-between;">
+        Replace with
+        <div style="display:flex;gap:3px;">
+          <div class="toggle-btn active" id="fontReplaceModeFont">Font</div>
+          <div class="toggle-btn"        id="fontReplaceModeStyle">Style</div>
+        </div>
+      </div>
+      <!-- Font mode -->
+      <div id="fontReplaceFontWrap">
+        <div class="select-wrap">
+          <select id="fontReplaceFamily">
+            <option value="">— Select a font family —</option>
+          </select>
+        </div>
+        <div class="select-wrap" style="margin-top:4px;">
+          <select id="fontReplaceStyle">
+            <option value="Regular">Regular</option>
+          </select>
+        </div>
+      </div>
+      <!-- Text style mode -->
+      <div id="fontReplaceStyleWrap" class="hidden">
+        <div class="select-wrap">
+          <select id="fontReplaceTextStyle">
+            <option value="">— Select a text style —</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FONT COLOR PANEL ═══ -->
+  <div id="panelFontColor" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find font color</div>
+      <div class="color-row">
+        <div class="color-swatch-wrap">
+          <div class="color-swatch" id="fontColorFindSwatch"></div>
+          <input type="color" id="fontColorFindPicker" value="#1e1e1e" />
+        </div>
+        <input id="fontColorFindHex" class="text-input" type="text"
+               placeholder="#1e1e1e" maxlength="7"
+               autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <div class="color-row">
+        <div class="color-swatch-wrap">
+          <div class="color-swatch" id="fontColorReplaceSwatch"></div>
+          <input type="color" id="fontColorReplacePicker" value="#000000" />
+        </div>
+        <input id="fontColorReplaceHex" class="text-input" type="text"
+               placeholder="#000000" maxlength="7"
+               autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FONT SIZE PANEL ═══ -->
+  <div id="panelFontSize" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find font size</div>
+      <input id="fontSizeFind" class="text-input" type="number" placeholder="e.g. 14" min="1" max="999" autocomplete="off" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <input id="fontSizeReplace" class="text-input" type="number" placeholder="e.g. 16" min="1" max="999" autocomplete="off" />
+    </div>
+  </div>
+
+  <!-- ═══ TEXT DECORATION PANEL ═══ -->
+  <div id="panelTextDecoration" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find decoration</div>
+      <div class="select-wrap">
+        <select id="textDecFind">
+          <option value="NONE">None</option>
+          <option value="UNDERLINE">Underline</option>
+          <option value="STRIKETHROUGH">Strikethrough</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <div class="select-wrap">
+        <select id="textDecReplace">
+          <option value="NONE">None</option>
+          <option value="UNDERLINE">Underline</option>
+          <option value="STRIKETHROUGH">Strikethrough</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PARAGRAPH SPACING PANEL ═══ -->
+  <div id="panelParagraphSpacing" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find paragraph spacing</div>
+      <input id="paraSpaceFind" class="text-input" type="number" placeholder="e.g. 8" min="0" max="999" autocomplete="off" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <input id="paraSpaceReplace" class="text-input" type="number" placeholder="e.g. 12" min="0" max="999" autocomplete="off" />
+    </div>
+  </div>
+
+  <!-- ═══ PARAGRAPH INDENT PANEL ═══ -->
+  <div id="panelParagraphIndent" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find paragraph indent</div>
+      <input id="paraIndentFind" class="text-input" type="number" placeholder="e.g. 16" min="0" max="999" autocomplete="off" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <input id="paraIndentReplace" class="text-input" type="number" placeholder="e.g. 24" min="0" max="999" autocomplete="off" />
+    </div>
+  </div>
+
+  <!-- ═══ TEXT CASE PANEL ═══ -->
+  <div id="panelTextCase" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find text case</div>
+      <div class="select-wrap">
+        <select id="textCaseFind">
+          <option value="ORIGINAL">Original</option>
+          <option value="UPPER">Uppercase</option>
+          <option value="LOWER">Lowercase</option>
+          <option value="TITLE">Title Case</option>
+          <option value="SMALL_CAPS">Small Caps</option>
+          <option value="SMALL_CAPS_FORCED">Small Caps (Forced)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <div class="select-wrap">
+        <select id="textCaseReplace">
+          <option value="ORIGINAL">Original</option>
+          <option value="UPPER">Uppercase</option>
+          <option value="LOWER">Lowercase</option>
+          <option value="TITLE">Title Case</option>
+          <option value="SMALL_CAPS">Small Caps</option>
+          <option value="SMALL_CAPS_FORCED">Small Caps (Forced)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STYLES PANEL ═══ -->
+  <div id="panelStyles" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find style</div>
+      <div class="select-wrap">
+        <select id="stylesFind">
+          <option value="" disabled selected>— Select a style —</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <div class="select-wrap">
+        <select id="stylesReplace">
+          <option value="" disabled selected>— Select a style —</option>
+          <option value="__custom__">Custom…</option>
+        </select>
+      </div>
+      <input id="stylesReplaceCustom" class="text-input hidden" type="text"
+             placeholder="Enter exact style name…" autocomplete="off" spellcheck="false" />
+    </div>
+  </div>
+
+  <!-- ═══ SHAPE & FRAME PANEL ═══ -->
+  <div id="panelShape" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find fill color</div>
+      <div class="color-row">
+        <div class="color-swatch-wrap">
+          <div class="color-swatch" id="shapeFindSwatch"></div>
+          <input type="color" id="shapeFindPicker" value="#0d99ff" />
+        </div>
+        <input id="shapeFindHex" class="text-input" type="text"
+               placeholder="#0d99ff" maxlength="7"
+               autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <div class="color-row">
+        <div class="color-swatch-wrap">
+          <div class="color-swatch" id="shapeReplaceSwatch"></div>
+          <input type="color" id="shapeReplacePicker" value="#ffffff" />
+        </div>
+        <input id="shapeReplaceHex" class="text-input" type="text"
+               placeholder="#ffffff" maxlength="7"
+               autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STROKE PANEL ═══ -->
+  <div id="panelStroke" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find stroke color</div>
+      <div class="color-row">
+        <div class="color-swatch-wrap">
+          <div class="color-swatch" id="strokeFindSwatch"></div>
+          <input type="color" id="strokeFindPicker" value="#1e1e1e" />
+        </div>
+        <input id="strokeFindHex" class="text-input" type="text"
+               placeholder="#1e1e1e" maxlength="7"
+               autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <div class="color-row">
+        <div class="color-swatch-wrap">
+          <div class="color-swatch" id="strokeReplaceSwatch"></div>
+          <input type="color" id="strokeReplacePicker" value="#ffffff" />
+        </div>
+        <input id="strokeReplaceHex" class="text-input" type="text"
+               placeholder="#ffffff" maxlength="7"
+               autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ VARIABLES PANEL ═══ -->
+  <div id="panelVariables" class="panel hidden">
+    <div class="field-group">
+      <div class="field-label">Find variable</div>
+      <input id="varsFind" class="text-input" type="text" list="varsFindList"
+             placeholder="e.g. colors/primary" autocomplete="off" spellcheck="false" />
+      <datalist id="varsFindList"></datalist>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Replace with</div>
+      <input id="varsReplace" class="text-input" type="text" list="varsReplaceList"
+             placeholder="e.g. colors/secondary" autocomplete="off" spellcheck="false" />
+      <datalist id="varsReplaceList"></datalist>
+    </div>
+  </div>
+
+  <!-- ═══ RESULTS ═══ -->
+  <div class="results-wrap">
+    <div class="results-header">
+      <div class="results-label">Results</div>
+      <div class="results-count" id="resultsCount"></div>
+    </div>
+    <div class="results-list" id="resultsList">
+      <div class="results-empty" id="resultsEmpty">Run Find to see matches</div>
+    </div>
+  </div>
+
+</div><!-- /.body -->
+
+<!-- ── Footer ────────────────────────────────────────────────────────── -->
+<div class="footer">
+  <button class="btn btn-secondary" id="btnFindAll">Find All</button>
+  <button class="btn btn-secondary" id="btnReplaceOne" disabled>Replace</button>
+  <button class="btn btn-primary"   id="btnReplaceAll" disabled>Replace All</button>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="resizeHandle"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let activeScope    = 'global';
+let activeCat      = 'text';
+let caseSensitive  = false;
+let wholeWord      = false;
+let currentMatches = [];
+let activeMatchIdx = -1;
+let availableStyles    = [];
+let availableVariables = [];
+let fontReplaceMode    = 'font'; // 'font' | 'style'
+
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
+const resultsList  = document.getElementById('resultsList');
+const resultsEmpty = document.getElementById('resultsEmpty');
+const resultsCount = document.getElementById('resultsCount');
+const btnFindAll   = document.getElementById('btnFindAll');
+const btnReplaceOne = document.getElementById('btnReplaceOne');
+const btnReplaceAll = document.getElementById('btnReplaceAll');
+
+// ─── Scope state ──────────────────────────────────────────────────────────────
+let selectionCount    = 0;
+let selectedSections  = [];   // [{id, name}]
+let activePageId      = '';   // used when scope='page'
+
+// ─── Scope select ─────────────────────────────────────────────────────────────
+document.getElementById('scopeSelect').addEventListener('change', function() {
+  activeScope = this.value;
+  updateContextHint();
+  clearResults();
+});
+
+// ─── Context hint (selection / section / page) ────────────────────────────────
+function updateContextHint() {
+  const hint     = document.getElementById('contextHint');
+  const hintText = document.getElementById('contextHintText');
+  const pagePicker = document.getElementById('pagePickerWrap');
+
+  // Reset
+  hint.classList.add('hidden');
+  hint.classList.remove('warn');
+  pagePicker.style.display = 'none';
+
+  if (activeScope === 'selection') {
+    hint.classList.remove('hidden');
+    if (selectionCount === 0) {
+      hint.classList.add('warn');
+      hintText.textContent = 'Nothing selected — select objects on the canvas first';
+    } else {
+      hintText.textContent = `${selectionCount} object${selectionCount === 1 ? '' : 's'} selected`;
+    }
+  } else if (activeScope === 'section') {
+    hint.classList.remove('hidden');
+    if (selectedSections.length === 0) {
+      hint.classList.add('warn');
+      hintText.textContent = 'No section selected — select a section on the canvas';
+    } else {
+      const names = selectedSections.map(s => s.name).join(', ');
+      hintText.textContent = `Section: ${names}`;
+    }
+  } else if (activeScope === 'page') {
+    hint.classList.remove('hidden');
+    hintText.textContent = 'Page:';
+    pagePicker.style.display = 'block';
+  }
+}
+
+// ─── Category select ──────────────────────────────────────────────────────────
+const PANELS = {
+  text:             'panelText',
+  font:             'panelFont',
+  fontColor:        'panelFontColor',
+  fontSize:         'panelFontSize',
+  textDecoration:   'panelTextDecoration',
+  paragraphSpacing: 'panelParagraphSpacing',
+  paragraphIndent:  'panelParagraphIndent',
+  textCase:         'panelTextCase',
+  styles:           'panelStyles',
+  shape:            'panelShape',
+  stroke:           'panelStroke',
+  variables:        'panelVariables',
+};
+
+
+document.getElementById('catSelect').addEventListener('change', function() {
+  activeCat = this.value;
+  Object.values(PANELS).forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById(PANELS[activeCat]).classList.remove('hidden');
+  clearResults();
+});
+
+// ─── Text toggles ─────────────────────────────────────────────────────────────
+// Page picker — keep activePageId in sync
+document.getElementById('pageSelect').addEventListener('change', function() {
+  activePageId = this.value;
+  clearResults();
+});
+
+document.getElementById('btnCaseSensitive').addEventListener('click', function() {
+  caseSensitive = !caseSensitive;
+  this.classList.toggle('active', caseSensitive);
+  clearResults();
+});
+document.getElementById('btnWholeWord').addEventListener('click', function() {
+  wholeWord = !wholeWord;
+  this.classList.toggle('active', wholeWord);
+  clearResults();
+});
+
+// ─── Font replace mode toggle ─────────────────────────────────────────────────
+function setFontReplaceMode(mode) {
+  fontReplaceMode = mode;
+  document.getElementById('fontReplaceModeFont').classList.toggle('active', mode === 'font');
+  document.getElementById('fontReplaceModeStyle').classList.toggle('active', mode === 'style');
+  document.getElementById('fontReplaceFontWrap').classList.toggle('hidden', mode === 'style');
+  document.getElementById('fontReplaceStyleWrap').classList.toggle('hidden', mode === 'font');
+  clearResults();
+}
+document.getElementById('fontReplaceModeFont').addEventListener('click', () => setFontReplaceMode('font'));
+document.getElementById('fontReplaceModeStyle').addEventListener('click', () => setFontReplaceMode('style'));
+
+// ─── Font replace family → style cascade ─────────────────────────────────────
+function populateFontStyles(family) {
+  const styleSel = document.getElementById('fontReplaceStyle');
+  const prev     = styleSel.value;
+  styleSel.innerHTML = '';
+  const entry = (window.__availableFonts || []).find(f => f.family === family);
+  const styles = entry ? entry.styles : ['Regular'];
+  styles.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    styleSel.appendChild(opt);
+  });
+  if (styles.includes(prev)) styleSel.value = prev;
+  clearResults();
+}
+
+document.getElementById('fontReplaceFamily').addEventListener('change', function() {
+  if (this.value) populateFontStyles(this.value);
+  clearResults();
+});
+
+// ─── Color swatch ↔ hex sync ─────────────────────────────────────────────────
+function wireColorPair(swatchId, pickerId, hexId) {
+  const swatch = document.getElementById(swatchId);
+  const picker = document.getElementById(pickerId);
+  const hex    = document.getElementById(hexId);
+
+  function updateSwatch(color) { swatch.style.background = color; }
+
+  picker.addEventListener('input', () => {
+    hex.value = picker.value;
+    updateSwatch(picker.value);
+    clearResults();
+  });
+  hex.addEventListener('input', () => {
+    const val = hex.value.trim();
+    if (/^#?[0-9a-fA-F]{6}$/.test(val)) {
+      const normalized = val.startsWith('#') ? val : '#' + val;
+      picker.value = normalized;
+      updateSwatch(normalized);
+    }
+    clearResults();
+  });
+  hex.addEventListener('blur', () => {
+    let val = hex.value.trim().replace('#', '');
+    if (val.length === 3) val = val[0]+val[0]+val[1]+val[1]+val[2]+val[2];
+    if (/^[0-9a-fA-F]{6}$/.test(val)) {
+      hex.value = '#' + val.toLowerCase();
+      picker.value = hex.value;
+      updateSwatch(hex.value);
+    }
+  });
+  // Init swatch
+  updateSwatch(picker.value);
+  hex.value = picker.value;
+}
+
+wireColorPair('fontColorFindSwatch',    'fontColorFindPicker',    'fontColorFindHex');
+wireColorPair('fontColorReplaceSwatch', 'fontColorReplacePicker', 'fontColorReplaceHex');
+wireColorPair('shapeFindSwatch',    'shapeFindPicker',    'shapeFindHex');
+wireColorPair('shapeReplaceSwatch', 'shapeReplacePicker', 'shapeReplaceHex');
+wireColorPair('strokeFindSwatch',   'strokeFindPicker',   'strokeFindHex');
+wireColorPair('strokeReplaceSwatch','strokeReplacePicker','strokeReplaceHex');
+
+// ─── Clear find inputs on cat change ─────────────────────────────────────────
+function getFindValue() {
+  switch (activeCat) {
+    case 'text':             return document.getElementById('textFind').value.trim();
+    case 'font':             return document.getElementById('fontFind').value.trim();
+    case 'fontColor':        return document.getElementById('fontColorFindHex').value.trim();
+    case 'fontSize':         return document.getElementById('fontSizeFind').value.trim();
+    case 'textDecoration':   return document.getElementById('textDecFind').value;
+    case 'paragraphSpacing': return document.getElementById('paraSpaceFind').value.trim();
+    case 'paragraphIndent':  return document.getElementById('paraIndentFind').value.trim();
+    case 'textCase':         return document.getElementById('textCaseFind').value;
+    case 'styles':           return document.getElementById('stylesFind').value.trim();
+    case 'shape':            return document.getElementById('shapeFindHex').value.trim();
+    case 'stroke':           return document.getElementById('strokeFindHex').value.trim();
+    case 'variables':        return document.getElementById('varsFind').value.trim();
+  }
+  return '';
+}
+function getReplaceValue() {
+  switch (activeCat) {
+    case 'text':             return document.getElementById('textReplace').value;
+    case 'font': {
+      if (fontReplaceMode === 'style') {
+        const id = document.getElementById('fontReplaceTextStyle').value;
+        return id ? `textstyle:${id}` : '';
+      }
+      const family = document.getElementById('fontReplaceFamily').value;
+      const style  = document.getElementById('fontReplaceStyle').value;
+      return family ? `${family}||${style}` : '';
+    }
+    case 'fontColor':        return document.getElementById('fontColorReplaceHex').value.trim();
+    case 'fontSize':         return document.getElementById('fontSizeReplace').value.trim();
+    case 'textDecoration':   return document.getElementById('textDecReplace').value;
+    case 'paragraphSpacing': return document.getElementById('paraSpaceReplace').value.trim();
+    case 'paragraphIndent':  return document.getElementById('paraIndentReplace').value.trim();
+    case 'textCase':         return document.getElementById('textCaseReplace').value;
+    case 'styles': {
+      const sel = document.getElementById('stylesReplace');
+      return sel.value === '__custom__'
+        ? document.getElementById('stylesReplaceCustom').value.trim()
+        : sel.value.trim();
+    }
+    case 'shape':            return document.getElementById('shapeReplaceHex').value.trim();
+    case 'stroke':           return document.getElementById('strokeReplaceHex').value.trim();
+    case 'variables':        return document.getElementById('varsReplace').value.trim();
+  }
+  return '';
+}
+
+// ─── Find All ─────────────────────────────────────────────────────────────────
+btnFindAll.addEventListener('click', () => {
+  const find = getFindValue();
+  if (!find) { showToast('Enter a search value'); return; }
+  parent.postMessage({
+    pluginMessage: {
+      type: 'find',
+      category: activeCat,
+      scope:    activeScope,
+      find,
+      options:  { caseSensitive, wholeWord, pageId: activePageId },
+    }
+  }, '*');
+  btnFindAll.textContent = 'Searching…';
+  btnFindAll.disabled = true;
+});
+
+// ─── Replace One ─────────────────────────────────────────────────────────────
+btnReplaceOne.addEventListener('click', () => {
+  if (activeMatchIdx < 0 || activeMatchIdx >= currentMatches.length) {
+    showToast('Select a match first');
+    return;
+  }
+  const match   = currentMatches[activeMatchIdx];
+  const replace = getReplaceValue();
+  parent.postMessage({
+    pluginMessage: {
+      type:     'replace-one',
+      category: activeCat,
+      nodeId:   match.nodeId,
+      find:     getFindValue(),
+      replace,
+      options:  { caseSensitive, wholeWord, pageId: activePageId },
+    }
+  }, '*');
+});
+
+// ─── Replace All ─────────────────────────────────────────────────────────────
+btnReplaceAll.addEventListener('click', () => {
+  const find    = getFindValue();
+  const replace = getReplaceValue();
+  if (!find) { showToast('Enter a search value'); return; }
+  parent.postMessage({
+    pluginMessage: {
+      type:     'replace-all',
+      category: activeCat,
+      scope:    activeScope,
+      find,
+      replace,
+      options:  { caseSensitive, wholeWord, pageId: activePageId },
+    }
+  }, '*');
+  btnReplaceAll.textContent = 'Replacing…';
+  btnReplaceAll.disabled = true;
+});
+
+// ─── Keyboard shortcuts ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    btnFindAll.click();
+  }
+});
+
+// ─── Render results ───────────────────────────────────────────────────────────
+function renderMatches(matches, total) {
+  currentMatches = matches;
+  activeMatchIdx = -1;
+  btnReplaceOne.disabled = true;
+  btnReplaceAll.disabled = matches.length === 0;
+
+  // Count label
+  if (total === 0) {
+    resultsCount.innerHTML = '<span>No matches</span>';
+  } else if (total > matches.length) {
+    resultsCount.innerHTML = `<span class="n">${total}</span> matches (showing ${matches.length})`;
+  } else {
+    resultsCount.innerHTML = `<span class="n">${total}</span> match${total === 1 ? '' : 'es'}`;
+  }
+
+  // Clear list
+  while (resultsList.firstChild) resultsList.removeChild(resultsList.firstChild);
+
+  if (matches.length === 0) {
+    resultsEmpty.textContent = 'No matches found';
+    resultsList.appendChild(resultsEmpty);
+    return;
+  }
+
+  matches.forEach((match, idx) => {
+    const row = document.createElement('div');
+    row.className = 'match-row';
+    row.dataset.idx = idx;
+
+    const icon = document.createElement('div');
+    icon.className = 'match-type-icon';
+    icon.innerHTML = nodeTypeIcon(match.nodeType);
+
+    const content = document.createElement('div');
+    content.className = 'match-content';
+
+    const name = document.createElement('div');
+    name.className = 'match-name';
+    name.textContent = match.nodeName || '(unnamed)';
+
+    const preview = document.createElement('div');
+    preview.className = 'match-preview';
+    preview.textContent = match.preview;
+
+    content.appendChild(name);
+    content.appendChild(preview);
+
+    const replBtn = document.createElement('button');
+    replBtn.className = 'match-replace-btn';
+    replBtn.title = 'Replace this node';
+    replBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 6h8M7 3l3 3-3 3"/>
+    </svg>`;
+    replBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      setActiveMatch(idx);
+      btnReplaceOne.click();
+    });
+
+    row.appendChild(icon);
+    row.appendChild(content);
+    row.appendChild(replBtn);
+
+    row.addEventListener('click', () => {
+      setActiveMatch(idx);
+      parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: match.nodeId } }, '*');
+    });
+
+    resultsList.appendChild(row);
+  });
+}
+
+function setActiveMatch(idx) {
+  document.querySelectorAll('.match-row').forEach(r => r.classList.remove('active'));
+  const rows = document.querySelectorAll('.match-row');
+  if (rows[idx]) rows[idx].classList.add('active');
+  activeMatchIdx = idx;
+  btnReplaceOne.disabled = false;
+}
+
+function clearResults() {
+  currentMatches = [];
+  activeMatchIdx = -1;
+  while (resultsList.firstChild) resultsList.removeChild(resultsList.firstChild);
+  resultsEmpty.textContent = 'Run Find to see matches';
+  resultsList.appendChild(resultsEmpty);
+  resultsCount.innerHTML = '';
+  btnReplaceOne.disabled = true;
+  btnReplaceAll.disabled = true;
+}
+
+// ─── Node type icons ──────────────────────────────────────────────────────────
+function nodeTypeIcon(type) {
+  switch (type) {
+    case 'TEXT':
+      return `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 3h10M7 3v8M4 11h6"/></svg>`;
+    case 'FRAME':
+      return `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>`;
+    case 'GROUP':
+      return `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="3.5" width="7" height="7" rx="1"/><rect x="5.5" y="3.5" width="7" height="7" rx="1" fill="var(--bg)" stroke="currentColor"/></svg>`;
+    case 'COMPONENT':
+    case 'COMPONENT_SET':
+      return `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M7 1.5l4.5 5.5-4.5 5.5L2.5 7z"/></svg>`;
+    case 'INSTANCE':
+      return `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="1.5 1"><path d="M7 1.5l4.5 5.5-4.5 5.5L2.5 7z"/></svg>`;
+    case 'RECTANGLE':
+    case 'ELLIPSE':
+    case 'POLYGON':
+    case 'STAR':
+    case 'VECTOR':
+      return `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2.5" y="2.5" width="9" height="9" rx="2"/></svg>`;
+    default:
+      return `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="7" cy="7" r="4.5"/></svg>`;
+  }
+}
+
+// ─── Plugin → UI messages ─────────────────────────────────────────────────────
+window.onmessage = e => {
+  const msg = e.data.pluginMessage;
+  if (!msg) return;
+
+  switch (msg.type) {
+    case 'selection-changed':
+      selectionCount   = msg.count;
+      selectedSections = msg.sections ?? [];
+      updateContextHint();
+      if (activeScope === 'selection' || activeScope === 'section') clearResults();
+      break;
+
+    case 'pages': {
+      const pageSelect = document.getElementById('pageSelect');
+      const prev = pageSelect.value;
+      pageSelect.innerHTML = '';
+      msg.pages.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name + (p.isCurrent ? ' (current)' : '');
+        if (p.isCurrent && !prev) opt.selected = true;
+        pageSelect.appendChild(opt);
+      });
+      if (prev && [...pageSelect.options].some(o => o.value === prev)) pageSelect.value = prev;
+      activePageId = pageSelect.value;
+      break;
+    }
+
+    case 'matches':
+      btnFindAll.textContent = 'Find All';
+      btnFindAll.disabled = false;
+      renderMatches(msg.matches, msg.total);
+      break;
+
+    case 'replaced':
+      btnReplaceAll.textContent = 'Replace All';
+      btnReplaceAll.disabled = false;
+      showToast(`Replaced ${msg.count} node${msg.count === 1 ? '' : 's'}`);
+      // Re-run find to refresh results
+      if (msg.count > 0) btnFindAll.click();
+      break;
+
+    case 'replaced-one': {
+      btnReplaceOne.disabled = false;
+      if (msg.count > 0) {
+        showToast('Replaced');
+        // Remove the match row and advance
+        currentMatches.splice(activeMatchIdx, 1);
+        renderMatches(currentMatches, currentMatches.length);
+        if (currentMatches.length > 0) {
+          const next = Math.min(activeMatchIdx, currentMatches.length - 1);
+          setActiveMatch(next);
+          parent.postMessage({ pluginMessage: { type: 'select-node', nodeId: currentMatches[next].nodeId } }, '*');
+        }
+      } else {
+        showToast('No change');
+      }
+      break;
+    }
+
+    case 'fonts': {
+      const sel  = document.getElementById('fontFind');
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">— Select a font —</option>';
+      msg.fonts.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f; opt.textContent = f;
+        sel.appendChild(opt);
+      });
+      if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+      break;
+    }
+
+    case 'availableFonts': {
+      window.__availableFonts = msg.families; // { family, styles[] }[]
+      const famSel  = document.getElementById('fontReplaceFamily');
+      const prevFam = famSel.value;
+      famSel.innerHTML = '<option value="">— Select a font family —</option>';
+      msg.families.forEach(({ family }) => {
+        const opt = document.createElement('option');
+        opt.value = family; opt.textContent = family;
+        famSel.appendChild(opt);
+      });
+      if (prevFam && [...famSel.options].some(o => o.value === prevFam)) {
+        famSel.value = prevFam;
+        populateFontStyles(prevFam);
+      }
+      break;
+    }
+
+    case 'textStyles': {
+      const sel  = document.getElementById('fontReplaceTextStyle');
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">— Select a text style —</option>';
+      msg.styles.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id; opt.textContent = s.name;
+        sel.appendChild(opt);
+      });
+      if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+      break;
+    }
+
+    case 'styles':
+      availableStyles = msg.styles;
+      populateStyleSelects(availableStyles);
+      break;
+
+    case 'variables':
+      availableVariables = msg.variables;
+      populateDatalist('varsFindList',    availableVariables.map(v => v.collectionName ? `${v.collectionName}/${v.name}` : v.name));
+      populateDatalist('varsReplaceList', availableVariables.map(v => v.collectionName ? `${v.collectionName}/${v.name}` : v.name));
+      break;
+  }
+};
+
+function populateDatalist(id, names) {
+  const dl = document.getElementById(id);
+  dl.innerHTML = '';
+  names.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    dl.appendChild(opt);
+  });
+}
+
+function populateStyleSelects(styles) {
+  const findSel  = document.getElementById('stylesFind');
+  const replSel  = document.getElementById('stylesReplace');
+  const prevFind = findSel.value;
+  const prevRepl = replSel.value;
+
+  // Rebuild find select
+  findSel.innerHTML = '<option value="" disabled>— Select a style —</option>';
+
+  // Rebuild replace select — keep Custom at the bottom
+  replSel.innerHTML =
+    '<option value="" disabled>— Select a style —</option>' +
+    '<option value="__custom__">Custom…</option>';
+
+  function makeOpt(s) {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = s.name;
+    return o;
+  }
+
+  // Group by prefix (everything before the last "/")
+  const groups = {};
+  styles.forEach(s => {
+    const slash = s.name.lastIndexOf('/');
+    const group = slash > -1 ? s.name.slice(0, slash) : '';
+    (groups[group] = groups[group] || []).push(s);
+  });
+
+  const customOpt = replSel.querySelector('[value="__custom__"]');
+
+  Object.entries(groups).forEach(([group, list]) => {
+    if (group) {
+      const fg = document.createElement('optgroup');
+      fg.label = group;
+      const rg = document.createElement('optgroup');
+      rg.label = group;
+      list.forEach(s => { fg.appendChild(makeOpt(s)); rg.appendChild(makeOpt(s)); });
+      findSel.appendChild(fg);
+      replSel.insertBefore(rg, customOpt);
+    } else {
+      list.forEach(s => {
+        findSel.appendChild(makeOpt(s));
+        replSel.insertBefore(makeOpt(s), customOpt);
+      });
+    }
+  });
+
+  // Restore selections if still valid
+  if (prevFind && [...findSel.options].some(o => o.value === prevFind)) findSel.value = prevFind;
+  if (prevRepl && [...replSel.options].some(o => o.value === prevRepl)) replSel.value = prevRepl;
+}
+
+// Show / hide custom replace input when "Custom…" is chosen
+document.getElementById('stylesReplace').addEventListener('change', function() {
+  const custom = document.getElementById('stylesReplaceCustom');
+  if (this.value === '__custom__') {
+    custom.classList.remove('hidden');
+    custom.focus();
+  } else {
+    custom.classList.add('hidden');
+  }
+  clearResults();
+});
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+let toastTimer;
+const toast = document.getElementById('toast');
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ─── Resize handle ────────────────────────────────────────────────────────────
+const handle = document.getElementById('resizeHandle');
+let dragStartY = 0, dragStartH = 0;
+handle.addEventListener('pointerdown', e => {
+  dragStartY = e.clientY;
+  dragStartH = document.documentElement.clientHeight;
+  e.target.setPointerCapture(e.pointerId);
+});
+handle.addEventListener('pointermove', e => {
+  if (!e.buttons) return;
+  const newH = Math.max(300, Math.min(800, dragStartH + (e.clientY - dragStartY)));
+  parent.postMessage({ pluginMessage: { type: 'resize', height: Math.round(newH) } }, '*');
+});
+</script>
+</body>
+</html>
